@@ -131,18 +131,30 @@ install_python_dependencies() {
     fi
 }
 
-# Install Node.js and Yarn on Linux for BUILD_JUPYTER_EXTENSION. 
-# NodeSource apt is unreliable in CI.  macOS does not use this: CI wheels
-# disable the Jupyter extension; local macOS builds expect node/yarn on PATH
-# (typically brew install node; npm install -g yarn).
-install_nodejs_linux() {
+# Install Node.js and Yarn for BUILD_JUPYTER_EXTENSION.
+# Linux: downloads the official tarball (NodeSource apt is unreliable in CI).
+# macOS: uses Homebrew (brew install node; npm install -g yarn).
+install_nodejs() {
+    echo "Installing Node.js ${NODEJS_VERSION} and Yarn"
+    local arch node_arch tarball
+
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        if ! command -v node >/dev/null 2>&1; then
+            brew install node
+        fi
+        if ! command -v yarn >/dev/null 2>&1; then
+            npm install -g yarn
+        fi
+        node --version
+        yarn --version
+        return 0
+    fi
+
     if [[ "$OSTYPE" != "linux-gnu"* ]]; then
-        echo "install_nodejs_linux is for Linux only (current OSTYPE=$OSTYPE)"
+        echo "install_nodejs: unsupported OS (OSTYPE=$OSTYPE)"
         exit 1
     fi
 
-    echo "Installing Node.js ${NODEJS_VERSION} and Yarn"
-    local arch node_arch tarball
     arch="$(uname -m)"
     case "$arch" in
         x86_64) node_arch=linux-x64 ;;
@@ -161,6 +173,11 @@ install_nodejs_linux() {
     npm install -g yarn
     node --version
     yarn --version
+}
+
+# Backward-compatible alias.
+install_nodejs_linux() {
+    install_nodejs
 }
 
 build_all() {
@@ -208,14 +225,6 @@ build_pip_package() {
     echo "Building Open3D wheel"
     options="$(echo "$@" | tr ' ' '|')"
 
-    AARCH="$(uname -m)"
-    if [[ "$AARCH" == "aarch64" ]]; then
-        echo "Building for aarch64 architecture"
-        BUILD_FILAMENT_FROM_SOURCE=ON
-    else
-        echo "Building for x86_64 architecture"
-        BUILD_FILAMENT_FROM_SOURCE=OFF
-    fi
     set +u
     if [[ -f "${OPEN3D_ML_ROOT}/set_open3d_ml_root.sh" ]] &&
         [[ "$BUILD_TENSORFLOW_OPS" == "ON" || "$BUILD_PYTORCH_OPS" == "ON" ]]; then
@@ -238,11 +247,11 @@ build_pip_package() {
     if [[ "build_jupyter" =~ ^($options)$ ]]; then
         echo "Building Jupyter extension in Python wheel."
         BUILD_JUPYTER_EXTENSION=ON
-        BUILD_WEBRTC_FROM_SOURCE=ON
+        BUILD_WEBRTC=ON
     else
         echo "Jupyter extension disabled in Python wheel."
         BUILD_JUPYTER_EXTENSION=OFF
-        BUILD_WEBRTC_FROM_SOURCE=OFF
+        BUILD_WEBRTC=OFF
     fi
     set -u
 
@@ -256,9 +265,8 @@ build_pip_package() {
         "-DBUILD_LIBREALSENSE=ON"
         "-DBUILD_TENSORFLOW_OPS=$BUILD_TENSORFLOW_OPS"
         "-DBUILD_PYTORCH_OPS=$BUILD_PYTORCH_OPS"
-        "-DBUILD_FILAMENT_FROM_SOURCE=$BUILD_FILAMENT_FROM_SOURCE"
         "-DBUILD_JUPYTER_EXTENSION=$BUILD_JUPYTER_EXTENSION"
-        "-DBUILD_WEBRTC=$BUILD_WEBRTC_FROM_SOURCE"
+        "-DBUILD_WEBRTC=$BUILD_WEBRTC"
         "-DCMAKE_INSTALL_PREFIX=$OPEN3D_INSTALL_DIR"
         "-DCMAKE_BUILD_TYPE=Release"
         "-DBUILD_UNIT_TESTS=OFF"
@@ -492,12 +500,6 @@ build_pip_package_from_installed() {
         exit 1
     fi
 
-    AARCH="$(uname -m)"
-    if [[ "$AARCH" == "aarch64" ]]; then
-        BUILD_FILAMENT_FROM_SOURCE=ON
-    else
-        BUILD_FILAMENT_FROM_SOURCE=OFF
-    fi
     set +u
     if [[ -f "${OPEN3D_ML_ROOT}/set_open3d_ml_root.sh" ]] &&
         [[ "$BUILD_TENSORFLOW_OPS" == "ON" || "$BUILD_PYTORCH_OPS" == "ON" ]]; then
@@ -536,6 +538,9 @@ build_pip_package_from_installed() {
 
     local commonOptions=(
         "-DOPEN3D_USE_INSTALLED_LIBRARY=ON"
+        # CI's paired devel packages use Filament's prebuilt static GNU-ABI
+        # runtime. Do not look for shared system libc++ in wheel images.
+        "-DOPEN3D_USE_PREBUILT_FILAMENT_STATIC_LIBCXX_STDABI=ON"
         "-DDEVELOPER_BUILD=${DEVELOPER_BUILD}"
         "-DOPEN3D_GIT_HASH=${OPEN3D_GIT_HASH:-}"
         "-DBUILD_SHARED_LIBS=ON"
@@ -818,6 +823,7 @@ build_docs() {
     subst_version Doxyfile.in Doxyfile
     subst_version getting_started.in.rst getting_started.rst
     subst_version dev_wheels.in.rst dev_wheels.rst
+    subst_version sycl.in.rst sycl.rst
     subst_version docker.in.rst docker.rst
     python make_docs.py $DOC_ARGS --clean_notebooks --execute_notebooks=always \
         --py_api_rst=always --py_example_rst=always --sphinx --doxygen

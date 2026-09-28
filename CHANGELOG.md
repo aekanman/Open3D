@@ -1,4 +1,5 @@
 ## Main
+-   Add shared-device Vulkan Gaussian-splat rendering and update Filament integration for offscreen and interactive rendering.
 -   Reduce the installed size of the Open3D wheel: Open3D-ML Python dependencies are now an optional extra (`pip install open3d[ml]`, ~335 MB smaller for core-only installs) and `open3d.ml` submodules are imported lazily. `BUNDLE_OPEN3D_ML` now defaults to ON when ML ops are built and `OPEN3D_ML_ROOT` is set, and Windows wheels bundle Open3D-ML too (PR #7540).
 -   Add symmetric ICP registration to the legacy and Tensor pipelines (PR #7276).
 -   Replace OpenMP with oneAPI TBB for all CPU parallelism; Open3D no longer depends on OpenMP. This removes the `libomp` / `libgomp` runtime dependency and the thread oversubscription and crashes caused by loading multiple OpenMP runtimes in one process (e.g. alongside PyTorch in Python). The `WITH_OPENMP` CMake option is removed, oneTBB >= 2021.4.0 is required, and `OMP_NUM_THREADS` is replaced by `open3d.utility.set_max_threads()` (C++: `utility::SetMaxThreads()` or a `tbb::task_arena`). `utility::OMPProgressBar` is removed in favor of the thread-safe `utility::ProgressBar`; `utility::GetThreadNum()` and `utility::InParallel()` are removed (PR #6626) (issues #6196, #6544, #6750)
@@ -95,6 +96,7 @@
 -   macOS x86_64 not longer supported, only macOS arm64 is supported.
 -   Python 3.13+3.14 support
 -   Fix color artifacts in PointCloud projection due to CUDA race condition [(PR #7424)](https://github.com/isl-org/Open3D/pull/7424)
+-   Sync the bundled CUTLASS license with v4.2.1 (PR #7542).
 -   Fix Windows build failure for PyTorch ops due to PyTorch's bundled fmt (v11+) requiring `/utf-8` with MSVC (PR #7447)
 -   Fix `TriangleMesh::SamplePointsPoissonDisk` performance by incrementally updating neighbor weights instead of recomputing them with additional KD-tree queries (issue #7449)
 -   Add `GetMenu` for MenuBase for easy menu item/submenu control. (PR #7295)

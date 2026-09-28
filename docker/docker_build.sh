@@ -321,6 +321,7 @@ ci_build() {
     docker build \
         --build-arg BASE_IMAGE="${BASE_IMAGE}" \
         --build-arg DEVELOPER_BUILD="${DEVELOPER_BUILD}" \
+        --build-arg OPEN3D_GIT_HASH="${OPEN3D_GIT_HASH}" \
         --build-arg CCACHE_TAR_NAME="${CCACHE_TAR_NAME}" \
         --build-arg CMAKE_VERSION="${CMAKE_VERSION}" \
         --build-arg PYTHON_VERSION="${PYTHON_VERSION}" \
@@ -343,7 +344,7 @@ ci_build() {
                && tar -caf /opt/mount/${CCACHE_TAR_NAME}.tar.xz \
                    -C \$(dirname \"\$CCACHE_DIR\") \$(basename \"\$CCACHE_DIR\") \
                && find /opt/mount -maxdepth 1 -name 'open3d*' \
-                    -exec chown $(id -u):$(id -g) {} +"
+                -exec chown $(id -u):$(id -g) {} +"
 }
 
 2-noble_export_env() {
